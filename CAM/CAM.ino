@@ -10,7 +10,7 @@ const char* password = "12345678";
 const char* gatewayIP = "192.168.4.1";  // IP mặc định của AP
 const int tcpPort = 8888;
 
-// Cấu hình chân cho ESP32-CAM AI-Thinker
+// Cấu hình chân cho ESP32-CAM
 #define CAMERA_MODEL_AI_THINKER
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
@@ -61,13 +61,10 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-
-  // Chất lượng ảnh
   config.frame_size = FRAMESIZE_SVGA;
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
-  // Khởi động camera
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
@@ -78,7 +75,7 @@ void setup() {
 void sendImage(WiFiClient& client) {
   camera_fb_t* fb = esp_camera_fb_get();
   String imageData = base64::encode(fb->buf, fb->len);
-  client.println(imageData);  // Gửi ảnh qua TCP
+  client.println(imageData); 
   esp_camera_fb_return(fb);
 }
 
@@ -91,5 +88,5 @@ void loop() {
   } else {
     Serial.println("Connection failed!");
   }
-  delay(5000);  // Chụp ảnh mỗi 5s
+  delay(5000); 
 }

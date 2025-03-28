@@ -10,7 +10,7 @@ const char* ssid = "ESP32-Gateway";
 const char* password = "12345678";
 
 WiFiServer server(TCP_PORT);
-WiFiClient clients[5];  // Hỗ trợ tối đa 5 client
+WiFiClient clients[5];  
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
@@ -42,7 +42,7 @@ void loop() {
     if (clients[i] && clients[i].connected()) {
       while (clients[i].available()) {
         String data = clients[i].readStringUntil('\n');
-        Serial.printf("[CAM%d]%s\n", i, data.c_str());  // Gửi kèm ID CAM qua Serial
+        Serial.printf("[CAM%d]%s\n", i, data.c_str()); 
       }
     }
   }
