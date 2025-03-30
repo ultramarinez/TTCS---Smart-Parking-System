@@ -4,8 +4,8 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
-const char *ssid = "TP-Link_B552";
-const char *password = "17635295";
+const char* ssid = "ESP32-Gateway";
+const char* password = "12345678";
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(17, 16, 23, 18, 5, 19);
 
