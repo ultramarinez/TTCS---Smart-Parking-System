@@ -5,11 +5,19 @@ import os
 import re
 
 # Cấu hình Serial
-ser = serial.Serial('COM10', 115200)  
+ser = serial.Serial('COM25', 115200)  
 buffer = ""
 
 if not os.path.exists('received_images'):
     os.makedirs('received_images')
+    
+def send_command(slot_id, status):
+    command = f"{slot_id},{status}\n"  
+    ser.write(command.encode())
+    print(f"Đã gửi lệnh: {command.strip()}")
+
+send_command("A1", "full")
+send_command("B3", "full")
 
 while True:
     if ser.in_waiting > 0:

@@ -1,21 +1,20 @@
 #include <WiFi.h>
-#include <WiFiClient.h>
 #include <WiFiAP.h>
+#include <WiFiClient.h>
 
 #define SERIAL_BAUDRATE 115200
 #define TCP_PORT 8888
 
-// Cấu hình AP
-const char* ssid = "ESP32-Gateway";
-const char* password = "12345678";
+const char *ssid = "ESP32-Gateway";
+const char *password = "12345678";
 
 WiFiServer server(TCP_PORT);
-WiFiClient clients[5];  
+WiFiClient clients[5];
+WiFiClient monitorClient;
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
 
-  // Khởi tạo AP
   WiFi.softAP(ssid, password);
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP: ");
@@ -27,13 +26,31 @@ void setup() {
 void loop() {
   // Chấp nhận kết nối mới
   if (server.hasClient()) {
-    for (int i = 0; i < 5; i++) {
-      if (!clients[i] || !clients[i].connected()) {
-        clients[i] = server.available();
-        Serial.print("Client connected: ");
-        Serial.println(clients[i].remoteIP());
-        break;
-      }
+    WiFiClient newClient = server.available();
+
+    // Đọc định danh từ client
+    String clientType = newClient.readStringUntil('\n');
+    clientType.trim();
+
+    if (clientType == "MONITOR") {
+      monitorClient = newClient;
+      Serial.println("Monitor connected!");
+    } else {
+      Serial.println("CAM connected");
+    }
+  }
+
+  // Đọc lệnh Serial từ Py Server
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+
+    if (monitorClient && monitorClient.connected()) {
+      monitorClient.println(command);
+      Serial.print("Sent to Monitor: ");
+      Serial.println(command);
+    } else {
+      Serial.println("Monitor not connected!");
     }
   }
 
@@ -42,7 +59,7 @@ void loop() {
     if (clients[i] && clients[i].connected()) {
       while (clients[i].available()) {
         String data = clients[i].readStringUntil('\n');
-        Serial.printf("[CAM%d]%s\n", i, data.c_str()); 
+        Serial.printf("[CAM%d]%s\n", i, data.c_str());
       }
     }
   }

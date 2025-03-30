@@ -4,11 +4,13 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
-const char* ssid = "ESP32-Gateway";
-const char* password = "12345678";
+const char *ssid = "ESP32-Gateway";
+const char *password = "12345678";
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(17, 16, 23, 18, 5, 19);
-
+WiFiClient tcpClient;
+const char *gatewayIP = "192.168.4.1"; // Địa chỉ IP của Gateway
+const int tcpPort = 8888;
 WebServer server(8080);
 #define SLOT_COUNT 8
 #define SLOT_WIDTH 70
@@ -46,11 +48,20 @@ void setup() {
   server.on("/update", handleUpdate);
   server.on("/status", handleStatus);
   server.begin();
+
+  if (tcpClient.connect(gatewayIP, tcpPort)) {
+    tcpClient.println("MONITOR"); // Gửi định danh
+    Serial.println("Connected to gateway");
+  }
 }
 
 void loop() {
   server.handleClient();
-  handleSerial();
+  if (tcpClient.connected() && tcpClient.available()) {
+    String command = tcpClient.readStringUntil('\n');
+    command.trim();
+    processData(command); // Cập nhật trạng thái slot
+  }
 }
 
 void handleSerial() {
