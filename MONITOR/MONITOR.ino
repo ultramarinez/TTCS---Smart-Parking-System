@@ -4,14 +4,20 @@
 #include <WebServer.h>
 #include <WiFi.h>
 
+//  Access Point
 const char *ssid = "ESP32-Gateway";
 const char *password = "12345678";
 
+// TFT
 Adafruit_ILI9341 tft = Adafruit_ILI9341(17, 16, 23, 18, 5, 19);
-WiFiClient tcpClient;
-const char *gatewayIP = "192.168.4.1"; // Địa chỉ IP của Gateway
-const int tcpPort = 8888;
+
+// TCP Server
+WiFiServer tcpServer(8888);
+
+// Web Server
 WebServer server(8080);
+
+// Cấu hình slot
 #define SLOT_COUNT 8
 #define SLOT_WIDTH 70
 #define SLOT_HEIGHT 40
@@ -31,48 +37,43 @@ void setup() {
   tft.setRotation(3);
 
   initSlots();
-
   tft.fillScreen(ILI9341_BLACK);
   drawAllSlots();
 
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi connected");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  WiFi.softAP(ssid, password);
+  Serial.print("Access Point IP: ");
+  Serial.println(WiFi.softAPIP());
 
+  // Bắt đầu TCP server
+  tcpServer.begin();
+  Serial.println("TCP Server started");
+
+  // Bắt đầu Web server
   server.on("/", handleRoot);
   server.on("/update", handleUpdate);
   server.on("/status", handleStatus);
   server.begin();
-
-  if (tcpClient.connect(gatewayIP, tcpPort)) {
-    tcpClient.println("MONITOR"); // Gửi định danh
-    Serial.println("Connected to gateway");
-  }
 }
 
 void loop() {
   server.handleClient();
-  if (tcpClient.connected() && tcpClient.available()) {
-    String command = tcpClient.readStringUntil('\n');
-    command.trim();
-    processData(command); // Cập nhật trạng thái slot
-  }
-}
 
-void handleSerial() {
-  if (Serial.available()) {
-    String data = Serial.readStringUntil('\n');
-    processData(data);
+  WiFiClient client = tcpServer.available();
+  if (client) {
+    Serial.println("Client connected");
+    while (client.connected()) {
+      if (client.available()) {
+        String command = client.readStringUntil('\n');
+        command.trim();
+        processData(command);  // Cập nhật trạng thái slot
+      }
+    }
+    client.stop();
+    Serial.println("Client disconnected");
   }
 }
 
 void initSlots() {
-  // Hàng 1
   for (int i = 0; i < 4; i++) {
     slots[i].x = PADDING + i * (SLOT_WIDTH + PADDING);
     slots[i].y = PADDING;
@@ -80,7 +81,6 @@ void initSlots() {
     slots[i].isFull = false;
   }
 
-  // Hàng 2
   for (int i = 4; i < 8; i++) {
     slots[i].x = PADDING + (i - 4) * (SLOT_WIDTH + PADDING);
     slots[i].y = PADDING * 2 + SLOT_HEIGHT;
@@ -128,22 +128,17 @@ void drawAllSlots() {
 
 void drawSlot(int index) {
   Slot s = slots[index];
-
   tft.drawRect(s.x, s.y, SLOT_WIDTH, SLOT_HEIGHT, ILI9341_WHITE);
-
   uint16_t bgColor = s.isFull ? ILI9341_RED : ILI9341_GREEN;
   tft.fillRect(s.x + 1, s.y + 1, SLOT_WIDTH - 2, SLOT_HEIGHT - 2, bgColor);
-
   tft.setTextSize(2);
   tft.setTextColor(ILI9341_WHITE);
 
   int16_t x1, y1;
   uint16_t w, h;
   tft.getTextBounds(s.id, 0, 0, &x1, &y1, &w, &h);
-
   int xText = s.x + (SLOT_WIDTH - w) / 2;
   int yText = s.y + (SLOT_HEIGHT - h) / 2;
-
   tft.setCursor(xText, yText);
   tft.print(s.id);
 }
@@ -192,11 +187,9 @@ void handleRoot() {
     <div class="container">)";
 
   for (int i = 0; i < SLOT_COUNT; i++) {
-    html += "<div id='" + slots[i].id +
-            "' class='slot' onclick='updateSlot(\"" + slots[i].id + "\")'>";
+    html += "<div id='" + slots[i].id + "' class='slot' onclick='updateSlot(\"" + slots[i].id + "\")'>";
     html += "<div>" + slots[i].id + "</div>";
-    html += "<div class='status'>" +
-            String(slots[i].isFull ? "FULL" : "EMPTY") + "</div>";
+    html += "<div class='status'>" + String(slots[i].isFull ? "FULL" : "EMPTY") + "</div>";
     html += "</div>";
   }
 
@@ -226,8 +219,7 @@ void handleUpdate() {
 void handleStatus() {
   String json = "{";
   for (int i = 0; i < SLOT_COUNT; i++) {
-    json +=
-        "\"" + slots[i].id + "\":" + String(slots[i].isFull ? "true" : "false");
+    json += "\"" + slots[i].id + "\":" + String(slots[i].isFull ? "true" : "false");
     if (i < SLOT_COUNT - 1)
       json += ",";
   }
