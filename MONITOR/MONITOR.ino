@@ -3,10 +3,12 @@
 #include <SPI.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_now.h>
+#include "../env.h"
 
 //  Access Point
-const char *ssid = "ESP32-Gateway";
-const char *password = "12345678";
+const char *ssid = WIFI_SSID;
+const char *password = WIFI_PASSWORD;
 
 // TFT
 Adafruit_ILI9341 tft = Adafruit_ILI9341(17, 16, 23, 18, 5, 19);
@@ -17,7 +19,7 @@ WiFiServer tcpServer(8888);
 // Web Server
 WebServer server(8080);
 
-// Cấu hình slot
+// Define slot
 #define SLOT_COUNT 8
 #define SLOT_WIDTH 70
 #define SLOT_HEIGHT 40
@@ -40,15 +42,40 @@ void setup() {
   tft.fillScreen(ILI9341_BLACK);
   drawAllSlots();
 
-  WiFi.softAP(ssid, password);
-  Serial.print("Access Point IP: ");
-  Serial.println(WiFi.softAPIP());
+  WiFi.mode(WIFI_AP_STA);
+  delay(1000);
+  WiFi.begin(ssid, password, 1);
+  Serial.print("Connecting to WiFi ");
 
-  // Bắt đầu TCP server
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nConnected to WiFi!");
+  Serial.print("ESP IP: ");
+  Serial.println(WiFi.localIP());
+
+  // Show IP 
+  tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(5, 5);
+  tft.print("IP: ");
+  tft.println(WiFi.localIP());
+
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return;
+  }
+  esp_now_register_recv_cb(onEspNowReceive);
+
+
+  // Start TCP server
   tcpServer.begin();
   Serial.println("TCP Server started");
 
-  // Bắt đầu Web server
+  // Start Web server
   server.on("/", handleRoot);
   server.on("/update", handleUpdate);
   server.on("/status", handleStatus);
@@ -65,7 +92,7 @@ void loop() {
       if (client.available()) {
         String command = client.readStringUntil('\n');
         command.trim();
-        processData(command);  // Cập nhật trạng thái slot
+        processData(command);  // Update slot
       }
     }
     client.stop();
@@ -225,4 +252,19 @@ void handleStatus() {
   }
   json += "}";
   server.send(200, "application/json", json);
+}
+void onEspNowReceive(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) {
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+           recv_info->src_addr[0], recv_info->src_addr[1], recv_info->src_addr[2],
+           recv_info->src_addr[3], recv_info->src_addr[4], recv_info->src_addr[5]);
+
+  Serial.print("ESP-NOW data received from ");
+  Serial.println(macStr);
+
+  String payload = String((const char *)data).substring(0, len);
+  Serial.print("Data: ");
+  Serial.println(payload);
+
+  processData(payload);
 }
