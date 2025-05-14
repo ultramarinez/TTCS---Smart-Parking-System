@@ -242,7 +242,7 @@ int sendPhoto() {
     currentStatus = "Image Capture Failed";
     server.handleClient();  // Update status on webpage
     return -1;
-  }
+  } else {Serial.println("Capture Successfully");}
 
   client.setInsecure();  // Disable SSL
 
@@ -309,10 +309,6 @@ int sendPhoto() {
   recognizedPlate = parsePlateJson(response, 'p');
   timeStamp = parsePlateJson(response, 't');
   imageLink = parsePlateJson(response, 'n');
-
-  Serial.println(response);
-  Serial.println(recognizedPlate);
-  Serial.println(imageLink);
 
   currentStatus = "Response Recieved Successfully";
   server.handleClient();  // Update status on webpage
@@ -518,6 +514,6 @@ void loop() {
     closeBarrier();
 
     currentStatus = "Idle";
-    server.handleClient();  // Update status on webpage
+    server.handleClient();  
   }
 }
